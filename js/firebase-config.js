@@ -26,7 +26,7 @@ export const firebaseConfig = {
 // 2. "Create API Key" click karo — bilkul FREE hai student ke liye
 // 3. Copy karke neeche paste karo
 // ============================================
-export const GEMINI_API_KEY = "AQ.Ab8RN6Jqv9W0RjNhC4rP5EoyWfD6B1jAETLaZBCP79iyif6QFQ";
+export const GEMINI_API_KEY = "AQ.Ab8RN6Jrxq-Zwp4i0oDdpqCygL8FV6RxZV8wrMJXlXyG9W_Hag";
 
 // ============================================
 // FILE STORAGE (Cloudinary) — FREE, CARD NAHI CHAHIYE
