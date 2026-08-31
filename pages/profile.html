@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile — NotesBazaar Nepal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">📒 NotesBazaar<span>.np</span></div>
+  <nav id="mainNav"></nav>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span class="wallet-pill" id="walletDisplay">💰 Rs. 0</span>
+    <button class="logout-btn" id="logoutBtn">Logout</button>
+  </div>
+</header>
+
+<main style="max-width:700px;">
+  <h1 class="display" style="font-size:1.9rem;" id="userName">Profile</h1>
+  <p style="color:var(--ink-soft);" id="userGrade"></p>
+
+  <div class="stat-row">
+    <div class="stat-box"><div class="num" id="statEarn">Rs. 0</div><div class="lbl">Total Earning</div></div>
+    <div class="stat-box"><div class="num" id="statNotes">0</div><div class="lbl">Notes Uploaded</div></div>
+    <div class="stat-box"><div class="num" id="statTests">0</div><div class="lbl">Tests Diye</div></div>
+    <div class="stat-box"><div class="num" id="statAvg">0%</div><div class="lbl">Average Score</div></div>
+  </div>
+
+  <h3 class="display">📊 Test History</h3>
+  <div id="historyList"><p style="color:var(--ink-soft);">Loading...</p></div>
+
+  <div class="ad-slot">Ad space — AdSense approval ke baad yahan ads aayenge</div>
+</main>
+
+<footer>NotesBazaar Nepal</footer>
+
+<script type="module">
+import { requireAuth, renderNav, auth, signOut, db, doc, getDoc, collection, query, where, orderBy, getDocs } from "../js/app.js";
+
+renderNav("profile");
+document.getElementById("logoutBtn").onclick = () => signOut(auth).then(()=>window.location.href="../index.html");
+
+requireAuth(async (user) => {
+  const uSnap = await getDoc(doc(db, "users", user.uid));
+  const data = uSnap.data();
+
+  document.getElementById("userName").textContent = "👤 " + (data.name || user.displayName);
+  document.getElementById("userGrade").textContent = data.grade + " · " + data.email;
+  document.getElementById("walletDisplay").textContent = "💰 Rs. " + (data.earnings || 0);
+  document.getElementById("statEarn").textContent = "Rs. " + (data.earnings || 0);
+  document.getElementById("statNotes").textContent = data.notesUploaded || 0;
+  document.getElementById("statTests").textContent = data.testsAttempted || 0;
+
+  const q = query(collection(db, "results"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+  const list = document.getElementById("historyList");
+
+  if(snap.empty){
+    list.innerHTML = `<p style="color:var(--ink-soft);">Abhi tak koi test nahi diya — Weekly Test page pe jao!</p>`;
+    document.getElementById("statAvg").textContent = "0%";
+    return;
+  }
+
+  let totalPercent = 0, count = 0;
+  list.innerHTML = "";
+  snap.forEach(d => {
+    const r = d.data();
+    totalPercent += r.percent; count++;
+    const row = document.createElement("div");
+    row.className = "card";
+    row.style.marginBottom = "10px";
+    row.innerHTML = `<b>${r.subject}</b> (${r.grade}) — ${r.score}/${r.total} <span style="float:right; font-weight:700; color:${r.percent>=50?'var(--green)':'var(--accent)'}">${r.percent}%</span>`;
+    list.appendChild(row);
+  });
+  document.getElementById("statAvg").textContent = Math.round(totalPercent/count) + "%";
+});
+</script>
+</body>
+</html>

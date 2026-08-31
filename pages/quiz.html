@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Test — NotesBazaar Nepal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">📒 NotesBazaar<span>.np</span></div>
+  <nav id="mainNav"></nav>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span class="wallet-pill" id="walletDisplay">💰 Rs. 0</span>
+    <button class="logout-btn" id="logoutBtn">Logout</button>
+  </div>
+</header>
+
+<main style="max-width:700px;">
+  <h1 class="display" style="font-size:1.9rem;">📝 Weekly Test</h1>
+  <p style="color:var(--ink-soft);" id="gradeLabel">Loading...</p>
+
+  <div class="filters">
+    <select id="subjectPicker">
+      <option>Science</option><option>Math</option><option>English</option><option>Social Studies</option>
+    </select>
+    <button class="btn btn-primary" onclick="startQuiz()">Test Shuru Karo</button>
+  </div>
+
+  <div id="quizArea"></div>
+  <div id="resultArea" style="display:none;" class="card"></div>
+</main>
+
+<footer>NotesBazaar Nepal</footer>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { requireAuth, renderNav, auth, signOut, db, doc, getDoc, updateDoc, increment, collection, addDoc, serverTimestamp } from "../js/app.js";
+
+renderNav("quiz");
+document.getElementById("logoutBtn").onclick = () => signOut(auth).then(()=>window.location.href="../index.html");
+
+function showToast(msg){
+  const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2800);
+}
+
+let currentUser = null;
+let userGrade = "Grade 10";
+
+// Sample question bank — grade/subject wise. Add jitne chaho, structure same rakho.
+const QUESTION_BANK = {
+  Science: [
+    { q: "Photosynthesis mein plants kis gas ko lete hain?", options: ["Oxygen","Carbon Dioxide","Nitrogen","Hydrogen"], correct: 1 },
+    { q: "Human body mein sabse bada organ kaunsa hai?", options: ["Liver","Heart","Skin","Brain"], correct: 2 },
+    { q: "Newton ka pehla law kis cheez se related hai?", options: ["Inertia","Gravity","Energy","Heat"], correct: 0 },
+    { q: "Water ka chemical formula kya hai?", options: ["CO2","H2O","O2","NaCl"], correct: 1 },
+    { q: "Sabse chhota unit of matter kya hai?", options: ["Molecule","Atom","Cell","Electron"], correct: 1 },
+  ],
+  Math: [
+    { q: "5² + 3² kitna hota hai?", options: ["34","28","16","64"], correct: 0 },
+    { q: "Ek triangle ke total angles kitne degree ke hote hain?", options: ["90°","180°","360°","270°"], correct: 1 },
+    { q: "√144 kya hai?", options: ["11","12","13","14"], correct: 1 },
+    { q: "Kisi number ko 0 se divide karo toh kya milta hai?", options: ["0","1","Undefined","Infinity"], correct: 2 },
+    { q: "10% of 250 kitna hota hai?", options: ["20","25","15","30"], correct: 1 },
+  ],
+  English: [
+    { q: "'Beautiful' ka opposite kya hai?", options: ["Pretty","Ugly","Nice","Good"], correct: 1 },
+    { q: "Past tense of 'Go' kya hai?", options: ["Goed","Gone","Went","Going"], correct: 2 },
+    { q: "'A group of stars' ko kya kehte hain?", options: ["Cluster","Constellation","Galaxy","Orbit"], correct: 1 },
+    { q: "Noun kya batata hai?", options: ["Action","Person/Place/Thing","Quality","Time"], correct: 1 },
+    { q: "'Quickly' kaunsa part of speech hai?", options: ["Noun","Verb","Adverb","Adjective"], correct: 2 },
+  ],
+  "Social Studies": [
+    { q: "Nepal ki capital kya hai?", options: ["Pokhara","Kathmandu","Biratnagar","Lalitpur"], correct: 1 },
+    { q: "Mount Everest kis desh mein hai?", options: ["India","China","Nepal","Bhutan"], correct: 2 },
+    { q: "Nepal ka national flower kya hai?", options: ["Rose","Rhododendron","Lotus","Marigold"], correct: 1 },
+    { q: "Nepal ki national language kya hai?", options: ["Hindi","Nepali","English","Newari"], correct: 1 },
+    { q: "Nepal mein kitne pradesh hain?", options: ["5","7","9","11"], correct: 1 },
+  ],
+};
+
+let currentQuiz = [];
+let selectedAnswers = [];
+
+requireAuth(async (user) => {
+  currentUser = user;
+  const uSnap = await getDoc(doc(db, "users", user.uid));
+  const data = uSnap.data();
+  userGrade = data.grade || "Grade 10";
+  document.getElementById("walletDisplay").textContent = "💰 Rs. " + (data.earnings || 0);
+  document.getElementById("gradeLabel").textContent = `${userGrade} ke liye subject chuno aur test do`;
+});
+
+window.startQuiz = () => {
+  const subject = document.getElementById("subjectPicker").value;
+  currentQuiz = QUESTION_BANK[subject];
+  selectedAnswers = new Array(currentQuiz.length).fill(null);
+  document.getElementById("resultArea").style.display = "none";
+  renderQuiz(subject);
+};
+
+function renderQuiz(subject){
+  const area = document.getElementById("quizArea");
+  area.innerHTML = "";
+  currentQuiz.forEach((q, qi) => {
+    const div = document.createElement("div");
+    div.className = "quiz-q";
+    div.innerHTML = `<p><b>Q${qi+1}.</b> ${q.q}</p>` +
+      q.options.map((opt, oi) => `<span class="opt" data-q="${qi}" data-o="${oi}">${opt}</span>`).join("");
+    area.appendChild(div);
+  });
+  area.querySelectorAll(".opt").forEach(el => {
+    el.addEventListener("click", () => {
+      const qi = parseInt(el.dataset.q), oi = parseInt(el.dataset.o);
+      selectedAnswers[qi] = oi;
+      area.querySelectorAll(`.opt[data-q="${qi}"]`).forEach(o => o.classList.remove("selected"));
+      el.classList.add("selected");
+    });
+  });
+  const submitBtn = document.createElement("button");
+  submitBtn.className = "btn btn-primary";
+  submitBtn.style.marginTop = "10px";
+  submitBtn.textContent = "Submit Test";
+  submitBtn.onclick = () => submitQuiz(subject);
+  area.appendChild(submitBtn);
+}
+
+async function submitQuiz(subject){
+  if(selectedAnswers.includes(null)){ showToast("Sabhi questions attempt karo"); return; }
+  let score = 0;
+  currentQuiz.forEach((q, qi) => { if(selectedAnswers[qi] === q.correct) score++; });
+  const percent = Math.round((score / currentQuiz.length) * 100);
+
+  await addDoc(collection(db, "results"), {
+    uid: currentUser.uid, subject, grade: userGrade,
+    score, total: currentQuiz.length, percent,
+    createdAt: serverTimestamp()
+  });
+  await updateDoc(doc(db, "users", currentUser.uid), { testsAttempted: increment(1) });
+
+  document.getElementById("quizArea").innerHTML = "";
+  const resArea = document.getElementById("resultArea");
+  resArea.style.display = "block";
+  resArea.innerHTML = `
+    <h3 class="display">Result: ${score}/${currentQuiz.length} (${percent}%)</h3>
+    <p style="color:var(--ink-soft);">${percent >= 80 ? "Zabardast! 🔥" : percent >= 50 ? "Achha kiya, aur practice karo 💪" : "Koi baat nahi, wapas notes padho aur try karo 📖"}</p>
+    <p>Profile page pe ye score save ho gaya hai.</p>
+  `;
+}
+</script>
+</body>
+</html>

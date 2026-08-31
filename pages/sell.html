@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notes Bechो — NotesBazaar Nepal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">📒 NotesBazaar<span>.np</span></div>
+  <nav id="mainNav"></nav>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span class="wallet-pill" id="walletDisplay">💰 Rs. 0</span>
+    <button class="logout-btn" id="logoutBtn">Logout</button>
+  </div>
+</header>
+
+<main style="max-width:600px;">
+  <h1 class="display" style="font-size:1.9rem;">💸 Apne Handwritten Notes Bechो</h1>
+  <p style="color:var(--ink-soft);">Note ko FREE rakhoge toh zyada log dekhenge aur tumhara profile popular banega. Paid rakhna hai toh bhi 80% tumhe milta hai.</p>
+
+  <div class="card">
+    <label>Note ka title</label>
+    <input type="text" id="title" placeholder="e.g. Grade 10 Science - Chapter 5 Notes">
+
+    <label>Grade</label>
+    <select id="grade">
+      <option>Grade 8</option><option>Grade 9</option><option>Grade 10</option>
+      <option>Grade 11</option><option>Grade 12</option>
+    </select>
+
+    <label>Subject</label>
+    <select id="subject">
+      <option>Science</option><option>Math</option><option>English</option>
+      <option>Social Studies</option><option>Nepali</option><option>Computer</option><option>Other</option>
+    </select>
+
+    <label>Price (Rs.) — 0 likho agar FREE rakhna hai</label>
+    <input type="number" id="price" placeholder="0" min="0">
+
+    <label>Notes ki photo ya PDF upload karo</label>
+    <input type="file" id="file" accept="image/*,.pdf">
+
+    <button class="btn btn-primary" style="width:100%; margin-top:14px;" onclick="publish()" id="publishBtn">Publish Karo</button>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-box"><div class="num" id="myUploads">0</div><div class="lbl">Notes Tumhare</div></div>
+    <div class="stat-box"><div class="num" id="myEarnings">Rs. 0</div><div class="lbl">Total Earning</div></div>
+  </div>
+</main>
+
+<footer>NotesBazaar Nepal · Payout eSewa/Khalti par manually process hota hai abhi</footer>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { requireAuth, renderNav, auth, signOut, db, doc, getDoc, updateDoc, increment, collection, addDoc, serverTimestamp } from "../js/app.js";
+import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from "../js/firebase-config.js";
+
+renderNav("sell");
+document.getElementById("logoutBtn").onclick = () => signOut(auth).then(()=>window.location.href="../index.html");
+
+function showToast(msg){
+  const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2800);
+}
+
+let currentUser = null;
+
+requireAuth(async (user) => {
+  currentUser = user;
+  const uSnap = await getDoc(doc(db, "users", user.uid));
+  const data = uSnap.data();
+  document.getElementById("walletDisplay").textContent = "💰 Rs. " + (data.earnings || 0);
+  document.getElementById("myUploads").textContent = data.notesUploaded || 0;
+  document.getElementById("myEarnings").textContent = "Rs. " + (data.earnings || 0);
+});
+
+window.publish = async () => {
+  const title = document.getElementById("title").value.trim();
+  const grade = document.getElementById("grade").value;
+  const subject = document.getElementById("subject").value;
+  const price = parseInt(document.getElementById("price").value) || 0;
+  const fileInput = document.getElementById("file");
+  const file = fileInput.files[0];
+
+  if(!title){ showToast("Title toh daalo"); return; }
+  if(!file){ showToast("Notes ki file/photo upload karo"); return; }
+
+  const btn = document.getElementById("publishBtn");
+  btn.disabled = true; btn.textContent = "Uploading...";
+
+  try{
+    // Cloudinary ko file bhejo (unsigned upload — koi backend/card nahi chahiye)
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+    const uploadRes = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
+      { method: "POST", body: formData }
+    );
+    const uploadData = await uploadRes.json();
+    if(!uploadData.secure_url) throw new Error(uploadData.error?.message || "Upload fail hua");
+    const fileURL = uploadData.secure_url;
+
+    await addDoc(collection(db, "notes"), {
+      title, grade, subject, price,
+      sellerUid: currentUser.uid,
+      sellerName: currentUser.displayName || "Student",
+      fileURL, downloads: 0,
+      createdAt: serverTimestamp()
+    });
+
+    await updateDoc(doc(db, "users", currentUser.uid), { notesUploaded: increment(1) });
+
+    showToast(`"${title}" publish ho gaya! 🚀`);
+    document.getElementById("title").value = "";
+    document.getElementById("price").value = "";
+    fileInput.value = "";
+    const uploadsEl = document.getElementById("myUploads");
+    uploadsEl.textContent = parseInt(uploadsEl.textContent) + 1;
+  }catch(e){
+    showToast("Error: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "Publish Karo";
+  }
+};
+</script>
+</body>
+</html>

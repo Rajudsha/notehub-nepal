@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse Notes — NotesBazaar Nepal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">📒 NotesBazaar<span>.np</span></div>
+  <nav id="mainNav"></nav>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span class="wallet-pill" id="walletDisplay">💰 Rs. 0</span>
+    <button class="logout-btn" id="logoutBtn">Logout</button>
+  </div>
+</header>
+
+<main>
+  <h1 class="display" style="font-size:1.9rem;">📚 Notes Browse Karo</h1>
+  <p style="color:var(--ink-soft);">Free notes sabse upar dikhte hain — grade aur subject se filter karo</p>
+
+  <div class="filters">
+    <select id="gradeFilter">
+      <option value="all">Sabhi Grade</option>
+      <option>Grade 8</option><option>Grade 9</option><option>Grade 10</option>
+      <option>Grade 11</option><option>Grade 12</option>
+    </select>
+    <button data-f="all" class="active">Sab</button>
+    <button data-f="free">Free</button>
+    <button data-f="paid">Paid</button>
+  </div>
+
+  <div class="ad-slot">Ad space — AdSense approval ke baad yahan ads aayenge</div>
+
+  <div class="notes-grid" id="notesGrid"><p style="color:var(--ink-soft);">Loading...</p></div>
+</main>
+
+<footer>NotesBazaar Nepal</footer>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { requireAuth, renderNav, auth, signOut, db, doc, getDoc, collection, getDocs, query, orderBy, updateDoc, increment, arrayUnion } from "../js/app.js";
+
+renderNav("notes");
+document.getElementById("logoutBtn").onclick = () => signOut(auth).then(()=>window.location.href="../index.html");
+
+function showToast(msg){
+  const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2800);
+}
+
+let allNotes = [];
+let currentUser = null;
+let userDoc = null;
+let activeFilter = "all";
+let gradeFilter = "all";
+
+requireAuth(async (user) => {
+  currentUser = user;
+  const uSnap = await getDoc(doc(db, "users", user.uid));
+  userDoc = uSnap.data();
+  document.getElementById("walletDisplay").textContent = "💰 Rs. " + (userDoc.earnings || 0);
+  await loadNotes();
+});
+
+async function loadNotes(){
+  const q = query(collection(db, "notes"), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+  allNotes = [];
+  snap.forEach(d => allNotes.push({ id: d.id, ...d.data() }));
+  // Free-first sort: this is the core "free se user aayega" logic
+  allNotes.sort((a,b) => (a.price - b.price));
+  renderNotes();
+}
+
+function renderNotes(){
+  const grid = document.getElementById("notesGrid");
+  let filtered = allNotes.filter(n => {
+    if(gradeFilter !== "all" && n.grade !== gradeFilter) return false;
+    if(activeFilter === "free") return n.price === 0;
+    if(activeFilter === "paid") return n.price > 0;
+    return true;
+  });
+  if(filtered.length === 0){
+    grid.innerHTML = `<p style="color:var(--ink-soft);">Abhi koi notes nahi hai is filter mein — sabse pehle tum upload karo!</p>`;
+    return;
+  }
+  grid.innerHTML = "";
+  filtered.forEach(n => {
+    const owned = (userDoc.ownedNotes || []).includes(n.id) || n.sellerUid === currentUser.uid;
+    const card = document.createElement("div");
+    card.className = "note-card";
+    card.innerHTML = `
+      <span class="tag ${n.price===0?'free':'paid'}">${n.price===0?'FREE':'PAID · Rs.'+n.price}</span>
+      <h5>${n.title}</h5>
+      <div class="meta">${n.grade} · ${n.subject} · by ${n.sellerName} · ${n.downloads||0} downloads</div>
+      <button ${owned || n.price===0 ? '' : ''} data-id="${n.id}">
+        ${owned ? '✓ Open Note' : (n.price===0 ? 'Download' : 'Khareedo — eSewa se')}
+      </button>
+    `;
+    card.querySelector("button").onclick = () => handleNoteClick(n, owned);
+    grid.appendChild(card);
+  });
+}
+
+async function handleNoteClick(note, owned){
+  if(owned){
+    window.open(note.fileURL, "_blank");
+    return;
+  }
+  if(note.price === 0){
+    await unlockNote(note);
+    window.open(note.fileURL, "_blank");
+    return;
+  }
+  // Paid note -> real eSewa redirect (merchant code needs to be set by site owner)
+  const confirmPay = confirm(
+    `Rs. ${note.price} pay karna hai eSewa se "${note.title}" ke liye.\n\n` +
+    `OK dabaoge toh eSewa payment page khulega. Payment complete karne ke baad wapas aake "Maine pay kar diya" confirm karna.`
+  );
+  if(confirmPay){
+    // eSewa test payment URL pattern — site owner apna merchant code daalega
+    const esewaURL = `https://rc-epay.esewa.com.np/api/epay/main/v2/form?amt=${note.price}&pdc=0&psc=0&txAmt=0&tAmt=${note.price}&pid=${note.id}&scd=YOUR_ESEWA_MERCHANT_CODE&su=success.html&fu=failure.html`;
+    window.open(esewaURL, "_blank");
+    setTimeout(async () => {
+      if(confirm("Payment ho gaya? Confirm karo toh note unlock ho jayega.")){
+        await unlockNote(note);
+        window.open(note.fileURL, "_blank");
+      }
+    }, 1500);
+  }
+}
+
+async function unlockNote(note){
+  await updateDoc(doc(db, "users", currentUser.uid), { ownedNotes: arrayUnion(note.id) });
+  await updateDoc(doc(db, "notes", note.id), { downloads: increment(1) });
+  if(note.price > 0){
+    const sellerCut = Math.round(note.price * 0.8);
+    await updateDoc(doc(db, "users", note.sellerUid), { earnings: increment(sellerCut) });
+  }
+  userDoc.ownedNotes = [...(userDoc.ownedNotes||[]), note.id];
+  showToast("Note unlock ho gaya! 🎉");
+  renderNotes();
+}
+
+document.getElementById("gradeFilter").addEventListener("change", e => { gradeFilter = e.target.value; renderNotes(); });
+document.querySelectorAll(".filters button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filters button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    activeFilter = btn.dataset.f;
+    renderNotes();
+  });
+});
+</script>
+</body>
+</html>

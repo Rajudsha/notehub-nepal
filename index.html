@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NotesBazaar Nepal — Padhai ka Bazaar</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">📒 NotesBazaar<span>.np</span></div>
+  <div id="authArea" style="font-size:0.85rem;"></div>
+</header>
+
+<main style="max-width:900px;">
+  <div style="text-align:center; margin-bottom:10px;">
+    <h1 class="display" style="font-size:clamp(1.8rem,4vw,2.8rem); margin-bottom:10px;">
+      Nepal ke students ke liye — <span style="background:linear-gradient(180deg,transparent 60%,var(--highlight) 60%);">handwritten notes</span> ka bazaar
+    </h1>
+    <p style="color:var(--ink-soft); font-size:1.05rem; max-width:560px; margin:0 auto 30px;">
+      Grade 8 se 12 tak — free notes padho, apne notes bechो, weekly test do, aur AI se padhai mein help lo. Sab kuch ek jagah.
+    </p>
+  </div>
+
+  <div class="form-box" id="loginBox">
+    <h3 class="display" style="margin-top:0;">Login Karo</h3>
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPassword" placeholder="Password">
+    <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="handleLogin()">Login</button>
+    <p style="text-align:center; font-size:0.85rem; margin-top:14px;">
+      Naya ho? <a href="#" style="color:var(--accent); font-weight:700;" onclick="toggleForm()">Signup karo</a>
+    </p>
+  </div>
+
+  <div class="form-box" id="signupBox" style="display:none;">
+    <h3 class="display" style="margin-top:0;">Signup Karo</h3>
+    <input type="text" id="signupName" placeholder="Poora naam">
+    <input type="email" id="signupEmail" placeholder="Email">
+    <input type="password" id="signupPassword" placeholder="Password (kam se kam 6 characters)">
+    <label>Tum kis grade mein ho?</label>
+    <select id="signupGrade">
+      <option>Grade 8</option><option>Grade 9</option><option>Grade 10</option>
+      <option>Grade 11</option><option>Grade 12</option>
+    </select>
+    <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="handleSignup()">Account Banao</button>
+    <p style="text-align:center; font-size:0.85rem; margin-top:14px;">
+      Pehle se account hai? <a href="#" style="color:var(--accent); font-weight:700;" onclick="toggleForm()">Login karo</a>
+    </p>
+  </div>
+
+  <div class="ad-slot">
+    Ad space — Google AdSense approval ke baad yahan real ads dikhenge
+    <!-- <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXX" data-ad-slot="XXXXXXXX" data-ad-format="auto"></ins> -->
+  </div>
+</main>
+
+<footer>NotesBazaar Nepal · Notes free rakhoge toh sabse zyada log dekhenge 📚</footer>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { auth, signup, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "./js/app.js";
+window.toggleForm = () => {
+  document.getElementById("loginBox").style.display = document.getElementById("loginBox").style.display === "none" ? "block" : "none";
+  document.getElementById("signupBox").style.display = document.getElementById("signupBox").style.display === "none" ? "block" : "none";
+};
+function showToast(msg){
+  const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2800);
+}
+window.handleSignup = async () => {
+  const name = document.getElementById("signupName").value.trim();
+  const email = document.getElementById("signupEmail").value.trim();
+  const password = document.getElementById("signupPassword").value;
+  const grade = document.getElementById("signupGrade").value;
+  if(!name || !email || password.length < 6){ showToast("Sab fields sahi se bharo (password 6+ characters)"); return; }
+  try{
+    await signup(name, email, password, grade);
+    window.location.href = "pages/notes.html";
+  }catch(e){ showToast("Error: " + e.message); }
+};
+window.handleLogin = async () => {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  try{
+    await signInWithEmailAndPassword(auth, email, password);
+    window.location.href = "pages/notes.html";
+  }catch(e){ showToast("Login fail: " + e.message); }
+};
+onAuthStateChanged(auth, (user)=>{
+  const area = document.getElementById("authArea");
+  if(user){
+    area.innerHTML = `<span style="margin-right:10px;">👤 ${user.displayName || user.email}</span>`;
+  }
+});
+</script>
+</body>
+</html>

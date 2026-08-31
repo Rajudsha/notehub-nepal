@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Help — NotesBazaar Nepal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">📒 NotesBazaar<span>.np</span></div>
+  <nav id="mainNav"></nav>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span class="wallet-pill" id="walletDisplay">💰 Rs. 0</span>
+    <button class="logout-btn" id="logoutBtn">Logout</button>
+  </div>
+</header>
+
+<main style="max-width:650px;">
+  <h1 class="display" style="font-size:1.9rem;">🤖 AI Padhai Helper</h1>
+  <p style="color:var(--ink-soft);">Koi bhi doubt poocho — Science, Math, English, kuch bhi. Free hai.</p>
+
+  <div class="chat-box" id="chatBox">
+    <div class="chat-msg ai">Namaste! Mujhse apna koi bhi study doubt poocho 📚</div>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="Apna sawaal likho..." onkeypress="if(event.key==='Enter') sendMsg()">
+    <button class="btn btn-primary" onclick="sendMsg()">Bhejo</button>
+  </div>
+</main>
+
+<footer>NotesBazaar Nepal · AI se guidance lo, lekin apni notebook mein bhi likhna mat bhoolo 📝</footer>
+
+<script type="module">
+import { requireAuth, renderNav, auth, signOut, db, doc, getDoc } from "../js/app.js";
+import { GEMINI_API_KEY } from "../js/firebase-config.js";
+
+renderNav("ai");
+document.getElementById("logoutBtn").onclick = () => signOut(auth).then(()=>window.location.href="../index.html");
+
+requireAuth(async (user) => {
+  const uSnap = await getDoc(doc(db, "users", user.uid));
+  const data = uSnap.data();
+  document.getElementById("walletDisplay").textContent = "💰 Rs. " + (data.earnings || 0);
+});
+
+function addMsg(text, cls){
+  const box = document.getElementById("chatBox");
+  const div = document.createElement("div");
+  div.className = "chat-msg " + cls;
+  div.textContent = text;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+window.sendMsg = async () => {
+  const input = document.getElementById("chatInput");
+  const msg = input.value.trim();
+  if(!msg) return;
+  addMsg(msg, "user");
+  input.value = "";
+  addMsg("Soch raha hoon...", "ai");
+  const box = document.getElementById("chatBox");
+
+  try{
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Tum ek friendly Nepali student tutor ho. Hindi-Nepali mix (Hinglish/Ne-glish) style mein, simple aur short jawab do (school student ke level pe). Sawaal: ${msg}`
+            }]
+          }]
+        })
+      }
+    );
+    const data = await res.json();
+    box.removeChild(box.lastChild); // remove "Soch raha hoon..."
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, samajh nahi paya. Dobara try karo.";
+    addMsg(reply, "ai");
+  }catch(e){
+    box.removeChild(box.lastChild);
+    addMsg("Error aaya — API key check karo firebase-config.js mein.", "ai");
+  }
+};
+</script>
+</body>
+</html>
