@@ -79,6 +79,11 @@ window.sendMsg = async () => {
     );
     const data = await res.json();
     box.removeChild(box.lastChild); // remove "Soch raha hoon..."
+    if(data.error){
+      addMsg("Error: " + data.error.message, "ai");
+      console.error("Gemini API error:", data.error);
+      return;
+    }
     const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, samajh nahi paya. Dobara try karo.";
     addMsg(reply, "ai");
   }catch(e){
