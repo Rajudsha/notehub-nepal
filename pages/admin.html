@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel — NotesBazaar Nepal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">📒 NotesBazaar<span>.np</span> — Admin</div>
+  <button class="logout-btn" id="logoutBtn">Logout</button>
+</header>
+
+<main>
+  <div id="deniedBox" style="display:none; text-align:center; padding:60px 0;">
+    <h2 class="display">🔒 Access Denied</h2>
+    <p style="color:var(--ink-soft);">Ye page sirf admin ke liye hai.</p>
+  </div>
+
+  <div id="adminBox" style="display:none;">
+    <h1 class="display" style="font-size:1.9rem;">🛠 Admin Panel</h1>
+
+    <div class="stat-row">
+      <div class="stat-box"><div class="num" id="totalUsers">0</div><div class="lbl">Total Students</div></div>
+      <div class="stat-box"><div class="num" id="totalNotes">0</div><div class="lbl">Total Notes</div></div>
+      <div class="stat-box"><div class="num" id="pendingCount">0</div><div class="lbl">Pending Withdrawals</div></div>
+      <div class="stat-box"><div class="num" id="pendingAmount">Rs. 0</div><div class="lbl">Amount to Pay Out</div></div>
+    </div>
+
+    <h3 class="display">💸 Withdrawal Requests</h3>
+    <p style="color:var(--ink-soft); font-size:0.88rem;">
+      Student ko eSewa/Khalti se manually payout amount bhejo, phir neeche "Mark as Paid" dabao.
+    </p>
+    <div id="withdrawalsList"></div>
+  </div>
+</main>
+
+<footer>NotesBazaar Nepal · Admin Only</footer>
+
+<script type="module">
+import { requireAuth, renderNav, auth, signOut, db, collection, getDocs, query, where, orderBy, doc, updateDoc, serverTimestamp } from "../js/app.js";
+import { ADMIN_EMAIL } from "../js/firebase-config.js";
+
+document.getElementById("logoutBtn").onclick = () => signOut(auth).then(()=>window.location.href="../index.html");
+
+requireAuth(async (user) => {
+  if(user.email !== ADMIN_EMAIL){
+    document.getElementById("deniedBox").style.display = "block";
+    return;
+  }
+  document.getElementById("adminBox").style.display = "block";
+  await loadStats();
+  await loadWithdrawals();
+});
+
+async function loadStats(){
+  const usersSnap = await getDocs(collection(db, "users"));
+  document.getElementById("totalUsers").textContent = usersSnap.size;
+
+  const notesSnap = await getDocs(collection(db, "notes"));
+  document.getElementById("totalNotes").textContent = notesSnap.size;
+}
+
+async function loadWithdrawals(){
+  const q = query(collection(db, "withdrawals"), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+  const list = document.getElementById("withdrawalsList");
+  list.innerHTML = "";
+
+  let pendingCount = 0, pendingAmount = 0;
+
+  if(snap.empty){
+    list.innerHTML = `<p style="color:var(--ink-soft);">Abhi koi withdrawal request nahi hai.</p>`;
+    return;
+  }
+
+  snap.forEach(d => {
+    const w = d.data();
+    if(w.status === "pending"){ pendingCount++; pendingAmount += w.payout; }
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.marginBottom = "10px";
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <b>${w.name}</b> (${w.email})<br>
+          <span style="font-size:0.85rem; color:var(--ink-soft);">
+            Total: Rs. ${w.totalAmount} · Fee: Rs. ${w.fee} · <b>Payout: Rs. ${w.payout}</b>
+          </span>
+        </div>
+        <div>
+          ${w.status === "paid"
+            ? `<span style="color:var(--green); font-weight:700;">✓ Paid</span>`
+            : `<button class="btn btn-green" data-id="${d.id}">Mark as Paid</button>`
+          }
+        </div>
+      </div>
+    `;
+    if(w.status !== "paid"){
+      card.querySelector("button").onclick = async () => {
+        await updateDoc(doc(db, "withdrawals", d.id), { status: "paid", paidAt: serverTimestamp() });
+        loadWithdrawals();
+      };
+    }
+    list.appendChild(card);
+  });
+
+  document.getElementById("pendingCount").textContent = pendingCount;
+  document.getElementById("pendingAmount").textContent = "Rs. " + pendingAmount;
+}
+</script>
+</body>
+</html>

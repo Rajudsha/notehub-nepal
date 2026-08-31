@@ -27,7 +27,7 @@ Nepal ke students ke liye handwritten notes marketplace. Grade 8-12, free-first 
 Ab `js/firebase-config.js` file kholo aur apna config paste karo (jahan `YOUR_API_KEY` likha hai wahan).
 
 ### Firestore Security Rules (zaroori — copy-paste karo)
-Firestore → Rules tab mein ye paste karo:
+Firestore → Rules tab mein ye paste karo (`YOUR_ADMIN_EMAIL` ki jagah apna admin email daalo):
 ```
 rules_version = '2';
 service cloud.firestore {
@@ -43,6 +43,11 @@ service cloud.firestore {
     }
     match /results/{resultId} {
       allow read, create: if request.auth != null;
+    }
+    match /withdrawals/{docId} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+      allow read: if request.auth != null;
+      allow update: if request.auth != null && request.auth.token.email == "YOUR_ADMIN_EMAIL";
     }
   }
 }
@@ -60,6 +65,23 @@ service cloud.firestore {
 6. `js/firebase-config.js` mein `CLOUDINARY_CLOUD_NAME` aur `CLOUDINARY_UPLOAD_PRESET` mein paste karo
 
 Free tier mein 25 credits/month milte hain (roughly 25GB uploads/views) — chhote scale ke liye kaafi hai.
+
+---
+
+## STEP 1C — Admin Panel Setup
+
+1. `js/firebase-config.js` mein `ADMIN_EMAIL` wali line mein apna email daalo (jisse tum login karoge)
+2. Firestore Rules mein bhi `YOUR_ADMIN_EMAIL` ki jagah wahi email daalo (upar rules mein)
+3. Apni site pe usi email se signup/login karo
+4. Admin panel yahan milega: `tumhari-site-url/pages/admin.html`
+
+**Commission structure (already code mein set hai):**
+- Har paid note sale pe **15% platform commission** kategora, seller ko **85%** milega
+- Jab student withdraw karega, uske **10% fee** katega (jaise Rs. 1000 withdraw karega toh Rs. 900 milega)
+- Withdraw karne ke liye **minimum Rs. 1000** balance chahiye
+- Admin panel mein saare pending withdrawal requests dikhenge — tumhe manually eSewa/Khalti se student ko paisa bhejna hai, phir "Mark as Paid" dabana hai
+
+**Important:** Admin panel link kahin bhi public menu mein nahi hai (security ke liye) — sirf direct URL se access hota hai, aur sirf tumhare admin email se login karne par hi khulega.
 
 ---
 

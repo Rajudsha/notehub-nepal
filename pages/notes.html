@@ -136,7 +136,7 @@ async function unlockNote(note){
   await updateDoc(doc(db, "users", currentUser.uid), { ownedNotes: arrayUnion(note.id) });
   await updateDoc(doc(db, "notes", note.id), { downloads: increment(1) });
   if(note.price > 0){
-    const sellerCut = Math.round(note.price * 0.8);
+    const sellerCut = Math.round(note.price * 0.85); // 15% admin commission
     await updateDoc(doc(db, "users", note.sellerUid), { earnings: increment(sellerCut) });
   }
   userDoc.ownedNotes = [...(userDoc.ownedNotes||[]), note.id];

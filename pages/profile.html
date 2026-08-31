@@ -27,6 +27,15 @@
     <div class="stat-box"><div class="num" id="statAvg">0%</div><div class="lbl">Average Score</div></div>
   </div>
 
+  <div class="card" style="margin-bottom:24px;">
+    <h3 class="display" style="margin-top:0;">💵 Paise Nikalo (Withdraw)</h3>
+    <p style="color:var(--ink-soft); font-size:0.88rem;">
+      Minimum <b>Rs. 1000</b> balance chahiye withdraw karne ke liye. Withdrawal pe <b>10% fee</b> katega (jaise Rs. 1000 nikaloge toh Rs. 900 milega — eSewa/Khalti se manually bheja jayega).
+    </p>
+    <button class="btn btn-primary" id="withdrawBtn" onclick="requestWithdraw()">Withdraw Request Bhejo</button>
+    <div id="withdrawHistory" style="margin-top:16px;"></div>
+  </div>
+
   <h3 class="display">📊 Test History</h3>
   <div id="historyList"><p style="color:var(--ink-soft);">Loading...</p></div>
 
@@ -36,21 +45,34 @@
 <footer>NotesBazaar Nepal</footer>
 
 <script type="module">
-import { requireAuth, renderNav, auth, signOut, db, doc, getDoc, collection, query, where, orderBy, getDocs } from "../js/app.js";
+import { requireAuth, renderNav, auth, signOut, db, doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, updateDoc, serverTimestamp } from "../js/app.js";
 
 renderNav("profile");
 document.getElementById("logoutBtn").onclick = () => signOut(auth).then(()=>window.location.href="../index.html");
 
+let currentUser = null;
+let currentEarnings = 0;
+
 requireAuth(async (user) => {
+  currentUser = user;
   const uSnap = await getDoc(doc(db, "users", user.uid));
   const data = uSnap.data();
+  currentEarnings = data.earnings || 0;
 
   document.getElementById("userName").textContent = "👤 " + (data.name || user.displayName);
   document.getElementById("userGrade").textContent = data.grade + " · " + data.email;
-  document.getElementById("walletDisplay").textContent = "💰 Rs. " + (data.earnings || 0);
-  document.getElementById("statEarn").textContent = "Rs. " + (data.earnings || 0);
+  document.getElementById("walletDisplay").textContent = "💰 Rs. " + currentEarnings;
+  document.getElementById("statEarn").textContent = "Rs. " + currentEarnings;
   document.getElementById("statNotes").textContent = data.notesUploaded || 0;
   document.getElementById("statTests").textContent = data.testsAttempted || 0;
+
+  const withdrawBtn = document.getElementById("withdrawBtn");
+  if(currentEarnings < 1000){
+    withdrawBtn.disabled = true;
+    withdrawBtn.textContent = `Minimum Rs. 1000 chahiye (abhi Rs. ${currentEarnings})`;
+  }
+
+  await loadWithdrawHistory(user.uid);
 
   const q = query(collection(db, "results"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
   const snap = await getDocs(q);
@@ -75,6 +97,44 @@ requireAuth(async (user) => {
   });
   document.getElementById("statAvg").textContent = Math.round(totalPercent/count) + "%";
 });
+
+window.requestWithdraw = async () => {
+  if(currentEarnings < 1000){ alert("Minimum Rs. 1000 balance chahiye withdraw karne ke liye."); return; }
+  const fee = Math.round(currentEarnings * 0.10);
+  const payout = currentEarnings - fee;
+  const confirmMsg = `Total balance: Rs. ${currentEarnings}\n10% fee: Rs. ${fee}\nTumhe milega: Rs. ${payout}\n\nAdmin manually eSewa/Khalti se bhejega tumhare account mein 1-3 din ke andar. Continue karein?`;
+  if(!confirm(confirmMsg)) return;
+
+  await addDoc(collection(db, "withdrawals"), {
+    uid: currentUser.uid,
+    name: currentUser.displayName || "Student",
+    email: currentUser.email,
+    totalAmount: currentEarnings,
+    fee, payout,
+    status: "pending",
+    createdAt: serverTimestamp()
+  });
+  await updateDoc(doc(db, "users", currentUser.uid), { earnings: 0 });
+
+  alert("Withdrawal request bhej diya! Admin jald hi process karega.");
+  window.location.reload();
+};
+
+async function loadWithdrawHistory(uid){
+  const q = query(collection(db, "withdrawals"), where("uid", "==", uid), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+  const box = document.getElementById("withdrawHistory");
+  if(snap.empty){ box.innerHTML = ""; return; }
+  box.innerHTML = "<p style='font-size:0.85rem; color:var(--ink-soft); margin-bottom:8px;'><b>Withdrawal History:</b></p>";
+  snap.forEach(d => {
+    const w = d.data();
+    const statusColor = w.status === "paid" ? "var(--green)" : "var(--accent)";
+    const row = document.createElement("div");
+    row.style.cssText = "font-size:0.85rem; padding:8px 0; border-bottom:1px dashed var(--line);";
+    row.innerHTML = `Rs. ${w.payout} <span style="float:right; font-weight:700; color:${statusColor};">${w.status === "paid" ? "✓ Paid" : "⏳ Pending"}</span>`;
+    box.appendChild(row);
+  });
+}
 </script>
 </body>
 </html>
