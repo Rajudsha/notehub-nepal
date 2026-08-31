@@ -4,7 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  onAuthStateChanged, signOut, updateProfile
+  onAuthStateChanged, signOut, updateProfile, setPersistence, browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, doc, setDoc, getDoc, getDocs,
@@ -15,6 +15,11 @@ import { firebaseConfig } from "./firebase-config.js";
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Har browser TAB ka apna independent login session rahega —
+// ek tab mein logout karne se doosre tab ka login nahi tootega
+// (isse admin aur student ko alag-alag tabs mein test kar sakte ho)
+setPersistence(auth, browserSessionPersistence);
 
 export {
   createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged,
