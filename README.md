@@ -47,7 +47,12 @@ service cloud.firestore {
     match /withdrawals/{docId} {
       allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
       allow read: if request.auth != null;
-      allow update: if request.auth != null && request.auth.token.email == "YOUR_ADMIN_EMAIL";
+      allow update: if request.auth != null && request.auth.token.email == "r2499178@gmail.com";
+    }
+    match /topups/{docId} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+      allow read: if request.auth != null;
+      allow update: if request.auth != null && request.auth.token.email == "r2499178@gmail.com";
     }
   }
 }
@@ -128,15 +133,19 @@ Free tier mein 25 credits/month milte hain (roughly 25GB uploads/views) — chho
 
 ---
 
-## Payment ke baare mein (eSewa/Khalti) — zaroori samjho
+## Payment System — Ab Kaise Kaam Karta Hai (Wallet-Based)
 
-Nepal mein real payment lene ke liye **eSewa** ya **Khalti** merchant account chahiye:
-- eSewa Merchant: https://esewa.com.np/#/merchant
-- Khalti Merchant: https://khalti.com/join/merchant/
+**Purana eSewa manual-confirm system hata diya gaya hai** — ab poora system **wallet-based** hai, jo zyada safe aur simple hai:
 
-Abhi is site mein `notes.html` ke andar eSewa ka payment link khulta hai, lekin **payment verify automatically nahi hoti** — kyunki uske liye ek backend server chahiye hota hai (Firebase Cloud Functions se ho sakta hai, lekin uske liye Firebase ka Blaze/paid plan activate karna padta hai, jisme bhi free tier included hai but card verification chahiye).
+1. **Student wallet mein paisa dalta hai:** `pages/topup.html` par jaake, admin ka QR code scan karke payment karta hai, phir payment ka screenshot upload karta hai
+2. **Admin verify karta hai:** Admin panel (`pages/admin.html`) mein topup request dikhti hai (screenshot ke saath) — admin verify karke "Approve" dabata hai, tabhi student ke wallet mein paisa add hota hai
+3. **Student notes khareedta hai:** Wallet balance se seedha paisa katega, real-time mein — koi manual confirm nahi chahiye
+4. **Seller ko earning milti hai:** Jab koi note bikta hai, seller ko 85% turant credit ho jata hai (uski "earnings", jo wallet balance se alag hai)
+5. **Seller withdraw karta hai:** Profile page se withdraw request bhejta hai (min Rs. 1000), admin manually eSewa/Khalti se bhejta hai, phir "Mark as Paid" dabata hai
 
-**Abhi ke liye:** Student "maine pay kar diya" confirm karta hai tab note unlock hota hai (trust-based, chhote scale ke liye theek hai). Jab users badh jayein aur real business banana ho, tab Cloud Functions se real payment verification add karna — us waqt bata dena, main help kar dunga.
+**Setup karna hai:**
+1. `js/firebase-config.js` mein `ADMIN_QR_URL` field mein apna QR code image ka URL daalo (Cloudinary Media Library se upload karke URL le lo)
+2. `ADMIN_PAYMENT_NOTE` mein apna eSewa/Khalti number ya note likh do (jo student ko dikhega)
 
 ---
 

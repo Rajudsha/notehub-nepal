@@ -28,6 +28,12 @@
       <div class="stat-box"><div class="num" id="pendingAmount">Rs. 0</div><div class="lbl">Amount to Pay Out</div></div>
     </div>
 
+    <h3 class="display">👛 Wallet Topup Requests</h3>
+    <p style="color:var(--ink-soft); font-size:0.88rem;">
+      Student ne payment ka screenshot bheja hai — verify karke Approve dabao (wallet mein paisa add ho jayega) ya Reject karo.
+    </p>
+    <div id="topupsList"></div>
+
     <h3 class="display">💸 Withdrawal Requests</h3>
     <p style="color:var(--ink-soft); font-size:0.88rem;">
       Student ko eSewa/Khalti se manually payout amount bhejo, phir neeche "Mark as Paid" dabao.
@@ -39,7 +45,7 @@
 <footer>NotesBazaar Nepal · Admin Only</footer>
 
 <script type="module">
-import { requireAuth, renderNav, auth, signOut, db, collection, getDocs, query, where, orderBy, doc, updateDoc, serverTimestamp } from "../js/app.js";
+import { requireAuth, renderNav, auth, signOut, db, collection, getDocs, query, where, orderBy, doc, updateDoc, increment, serverTimestamp } from "../js/app.js";
 import { ADMIN_EMAIL } from "../js/firebase-config.js";
 
 document.getElementById("logoutBtn").onclick = () => signOut(auth).then(()=>window.location.href="../index.html");
@@ -51,6 +57,7 @@ requireAuth(async (user) => {
   }
   document.getElementById("adminBox").style.display = "block";
   await loadStats();
+  await loadTopups();
   await loadWithdrawals();
 });
 
@@ -60,6 +67,56 @@ async function loadStats(){
 
   const notesSnap = await getDocs(collection(db, "notes"));
   document.getElementById("totalNotes").textContent = notesSnap.size;
+}
+
+async function loadTopups(){
+  const q = query(collection(db, "topups"), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+  const list = document.getElementById("topupsList");
+  list.innerHTML = "";
+
+  if(snap.empty){
+    list.innerHTML = `<p style="color:var(--ink-soft);">Abhi koi topup request nahi hai.</p>`;
+    return;
+  }
+
+  snap.forEach(d => {
+    const t = d.data();
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.marginBottom = "10px";
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div style="display:flex; gap:12px; align-items:center;">
+          <img src="${t.proofURL}" style="width:60px; height:60px; object-fit:cover; border-radius:6px; border:1px solid var(--line); cursor:pointer;" onclick="window.open('${t.proofURL}','_blank')">
+          <div>
+            <b>${t.name}</b> (${t.email})<br>
+            <span style="font-size:0.85rem; color:var(--ink-soft);">Amount: <b>Rs. ${t.amount}</b></span>
+          </div>
+        </div>
+        <div id="topup-actions-${d.id}">
+          ${t.status === "pending"
+            ? `<button class="btn btn-green" data-action="approve" data-id="${d.id}" data-uid="${t.uid}" data-amt="${t.amount}">Approve</button>
+               <button class="btn btn-ghost" data-action="reject" data-id="${d.id}" style="margin-left:6px;">Reject</button>`
+            : `<span style="color:${t.status==='approved'?'var(--green)':'var(--accent)'}; font-weight:700;">${t.status==='approved'?'✓ Approved':'✗ Rejected'}</span>`
+          }
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+
+    if(t.status === "pending"){
+      card.querySelector('[data-action="approve"]').onclick = async () => {
+        await updateDoc(doc(db, "users", t.uid), { walletBalance: increment(t.amount) });
+        await updateDoc(doc(db, "topups", d.id), { status: "approved", approvedAt: serverTimestamp() });
+        loadTopups();
+      };
+      card.querySelector('[data-action="reject"]').onclick = async () => {
+        await updateDoc(doc(db, "topups", d.id), { status: "rejected" });
+        loadTopups();
+      };
+    }
+  });
 }
 
 async function loadWithdrawals(){

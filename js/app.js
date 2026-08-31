@@ -32,7 +32,7 @@ export async function signup(name, email, password, grade) {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(cred.user, { displayName: name });
   await setDoc(doc(db, "users", cred.user.uid), {
-    name, email, grade, earnings: 0, notesUploaded: 0, testsAttempted: 0,
+    name, email, grade, earnings: 0, walletBalance: 0, notesUploaded: 0, testsAttempted: 0,
     createdAt: serverTimestamp()
   });
   return cred.user;
@@ -43,6 +43,7 @@ export function renderNav(activePage) {
   const links = [
     { id: "notes", label: "📚 Notes", href: "notes.html" },
     { id: "sell", label: "💸 Bechो", href: "sell.html" },
+    { id: "wallet", label: "👛 Wallet", href: "topup.html" },
     { id: "quiz", label: "📝 Weekly Test", href: "quiz.html" },
     { id: "ai", label: "🤖 AI Help", href: "ai-help.html" },
     { id: "profile", label: "👤 Profile", href: "profile.html" },

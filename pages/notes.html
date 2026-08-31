@@ -60,7 +60,7 @@ requireAuth(async (user) => {
   currentUser = user;
   const uSnap = await getDoc(doc(db, "users", user.uid));
   userDoc = uSnap.data();
-  document.getElementById("walletDisplay").textContent = "💰 Rs. " + (userDoc.earnings || 0);
+  document.getElementById("walletDisplay").textContent = "👛 Rs. " + (userDoc.walletBalance || 0);
   await loadNotes();
 });
 
@@ -95,8 +95,8 @@ function renderNotes(){
       <span class="tag ${n.price===0?'free':'paid'}">${n.price===0?'FREE':'PAID · Rs.'+n.price}</span>
       <h5>${n.title}</h5>
       <div class="meta">${n.grade} · ${n.subject} · by ${n.sellerName} · ${n.downloads||0} downloads</div>
-      <button ${owned || n.price===0 ? '' : ''} data-id="${n.id}">
-        ${owned ? '✓ Open Note' : (n.price===0 ? 'Download' : 'Khareedo — eSewa se')}
+      <button data-id="${n.id}">
+        ${owned ? '✓ Open Note' : (n.price===0 ? 'Download' : 'Khareedo — Rs.'+n.price)}
       </button>
     `;
     card.querySelector("button").onclick = () => handleNoteClick(n, owned);
@@ -114,22 +114,21 @@ async function handleNoteClick(note, owned){
     window.open(note.fileURL, "_blank");
     return;
   }
-  // Paid note -> real eSewa redirect (merchant code needs to be set by site owner)
-  const confirmPay = confirm(
-    `Rs. ${note.price} pay karna hai eSewa se "${note.title}" ke liye.\n\n` +
-    `OK dabaoge toh eSewa payment page khulega. Payment complete karne ke baad wapas aake "Maine pay kar diya" confirm karna.`
-  );
-  if(confirmPay){
-    // eSewa test payment URL pattern — site owner apna merchant code daalega
-    const esewaURL = `https://rc-epay.esewa.com.np/api/epay/main/v2/form?amt=${note.price}&pdc=0&psc=0&txAmt=0&tAmt=${note.price}&pid=${note.id}&scd=YOUR_ESEWA_MERCHANT_CODE&su=success.html&fu=failure.html`;
-    window.open(esewaURL, "_blank");
-    setTimeout(async () => {
-      if(confirm("Payment ho gaya? Confirm karo toh note unlock ho jayega.")){
-        await unlockNote(note);
-        window.open(note.fileURL, "_blank");
-      }
-    }, 1500);
+  // Paid note -> deduct from wallet balance
+  const balance = userDoc.walletBalance || 0;
+  if(balance < note.price){
+    if(confirm(`Wallet mein sirf Rs. ${balance} hai, is note ke liye Rs. ${note.price} chahiye.\n\nWallet topup page par jana hai?`)){
+      window.location.href = "topup.html";
+    }
+    return;
   }
+  if(!confirm(`Rs. ${note.price} wallet se katega "${note.title}" ke liye. Confirm karein?`)) return;
+
+  await updateDoc(doc(db, "users", currentUser.uid), { walletBalance: increment(-note.price) });
+  userDoc.walletBalance = balance - note.price;
+  document.getElementById("walletDisplay").textContent = "👛 Rs. " + userDoc.walletBalance;
+  await unlockNote(note);
+  window.open(note.fileURL, "_blank");
 }
 
 async function unlockNote(note){

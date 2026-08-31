@@ -45,3 +45,13 @@ export const CLOUDINARY_UPLOAD_PRESET = "notehub_notes";
 // ============================================
 // Apna email daalo (jisse tum login karoge)
 export const ADMIN_EMAIL = "r2499178@gmail.com";
+
+// ============================================
+// ADMIN QR CODE — apna payment QR (eSewa/Khalti) yahan daalo
+// ============================================
+// 1. Apne eSewa/Khalti app se apna QR code ka photo lo
+// 2. cloudinary.com dashboard > Media Library > Upload > apna QR image upload karo
+// 3. Upload hote hi uska URL milega (right click > Copy Image Address) — wahi neeche paste karo
+// ============================================
+export const ADMIN_QR_URL = "YOUR_QR_IMAGE_URL";
+export const ADMIN_PAYMENT_NOTE = "eSewa/Khalti ID: YOUR_PHONE_NUMBER";
