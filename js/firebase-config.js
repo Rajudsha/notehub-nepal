@@ -39,3 +39,9 @@ export const GEMINI_API_KEY = "AQ.Ab8RN6Jrxq-Zwp4i0oDdpqCygL8FV6RxZV8wrMJXlXyG9W
 // ============================================
 export const CLOUDINARY_CLOUD_NAME = "aficxcqc";
 export const CLOUDINARY_UPLOAD_PRESET = "notehub_notes";
+
+// ============================================
+// ADMIN — sirf ye email admin panel access kar sakega
+// ============================================
+// Apna email daalo (jisse tum login karoge)
+export const ADMIN_EMAIL = "r2499178@gmail.com";
